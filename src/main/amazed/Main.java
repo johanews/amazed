@@ -68,6 +68,7 @@ public class Main
     {
         parseArguments(args);
         Amazed amazed = new Amazed(map, sequential, forkAfter, period);
+        Thread.sleep(5000); // Make sure the UI is up before start
         long start = System.currentTimeMillis();
         amazed.solve();
         long stop = System.currentTimeMillis();
