@@ -112,7 +112,7 @@ public class ForkJoinSolver extends SequentialSolver {
             int node = it.next();
             task = new ForkJoinSolver(maze, forkAfter, predecessor, node);
             subtasks.add(task);
-            super.predecessor.put(node, current);
+            predecessor.put(node, current);
             task.fork();
         }
     }
