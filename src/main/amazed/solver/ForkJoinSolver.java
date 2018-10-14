@@ -3,7 +3,6 @@ package amazed.solver;
 import amazed.maze.Maze;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 /**
@@ -16,19 +15,12 @@ import java.util.concurrent.ConcurrentSkipListSet;
  */
 
 public class ForkJoinSolver extends SequentialSolver {
-    private static final long serialVersionUID = 1L;
 
     private static Set<Integer> visited = new ConcurrentSkipListSet<>();
-    private static Map<Integer, Integer> predecessor = new ConcurrentHashMap<>();
     private static boolean finished = false;
 
     private List<ForkJoinSolver> subtasks = new ArrayList<>();
     private int outset = start;
-
-    public ForkJoinSolver(Maze maze, int forkAfter, int outset) {
-        this(maze, forkAfter);
-        this.outset = outset;
-    }
 
     /**
      * Creates a solver that searches in <code>maze</code> from the start node to a
@@ -56,6 +48,13 @@ public class ForkJoinSolver extends SequentialSolver {
         this.forkAfter = forkAfter;
     }
 
+    private ForkJoinSolver(Maze maze, int forkAfter,
+                           Map<Integer, Integer> predecessor, int outset) {
+        this(maze, forkAfter);
+        this.outset = outset;
+        this.predecessor = predecessor;
+    }
+
     /**
      * Searches for and returns the path, as a list of node
      * identifiers, that goes from the start node to a goal node in
@@ -78,10 +77,8 @@ public class ForkJoinSolver extends SequentialSolver {
 
         while (!frontier.empty() && !finished) {
             int current = frontier.pop();
-
             if (maze.hasGoal(current)) {
                 maze.move(player, current);
-                super.predecessor = predecessor;
                 finished = true;
                 return pathFromTo(start, current);
             }
@@ -113,9 +110,9 @@ public class ForkJoinSolver extends SequentialSolver {
         ForkJoinSolver task;
         while (it.hasNext()) {
             int node = it.next();
-            task = new ForkJoinSolver(maze, forkAfter, node);
+            task = new ForkJoinSolver(maze, forkAfter, predecessor, node);
             subtasks.add(task);
-            predecessor.put(node, current);
+            super.predecessor.put(node, current);
             task.fork();
         }
     }

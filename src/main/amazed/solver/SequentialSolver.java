@@ -35,8 +35,7 @@ import java.util.Collections;
  */
 
 public class SequentialSolver extends RecursiveTask<List<Integer>> {
-    private static final long serialVersionUID = 1L;
-    
+
     /**
      * The maze being searched.
      */
