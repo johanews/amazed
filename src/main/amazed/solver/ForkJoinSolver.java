@@ -73,13 +73,17 @@ public class ForkJoinSolver extends SequentialSolver {
 
     private List<Integer> parallelSearch() {
         int player = maze.newPlayer(outset);
+
         frontier.push(outset);
 
         while (!frontier.empty() && !finished) {
             int current = frontier.pop();
+
             if (maze.hasGoal(current)) {
                 maze.move(player, current);
+
                 finished = true;
+
                 return pathFromTo(start, current);
             }
 
@@ -94,15 +98,18 @@ public class ForkJoinSolver extends SequentialSolver {
                 createTasks(current, it);
             }
         }
+
         return join_tasks();
     }
 
     private List<Integer> join_tasks() {
         for (ForkJoinSolver st: subtasks) {
             List<Integer> sp = st.join();
+
             if (sp != null)
                 return sp;
         }
+
         return null;
     }
 
@@ -110,10 +117,14 @@ public class ForkJoinSolver extends SequentialSolver {
         ForkJoinSolver task;
         while (it.hasNext()) {
             int node = it.next();
+
             task = new ForkJoinSolver(maze, forkAfter, predecessor, node);
+
             subtasks.add(task);
             predecessor.put(node, current);
+
             task.fork();
+            //task.join(); // only for testing
         }
     }
 
