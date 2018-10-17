@@ -72,26 +72,42 @@ public class ForkJoinSolver extends SequentialSolver {
     }
 
     private List<Integer> parallelSearch() {
+        // Prevent double spawns...
+        // if (!visited.contains(start)) {
         frontier.push(start);
         this.player = maze.newPlayer(start);
         System.out.println("starting at: " + this.start);
+        // }
 
         while (!this.frontier.empty() && !finished) {
+            Set<Integer> children;
             int current;
 
-            current = frontier.pop();
+            try {
+                current = frontier.pop();
 
-            if (this.isGoal(current)) {
-                return this.pathFromTo(start, current);
+                if (this.isGoal(current)) {
+                    return this.pathFromTo(outset, current);
+                }
+
+                children = this.explore(current);
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+                System.out.println("I have noting left in frontier or my frontier has already been explored. ");
+
+                break;
             }
 
-            Set<Integer> children = this.explore(current);
+            this.steps++;
 
             // Either add children to frontier or fork.
 
             // Add children to frontier
+            int childNodeCount = 0;
+
             for (Integer childNode : children) {
                 frontier.push(childNode);
+                childNodeCount++;
 
                 if (!visited.contains(childNode)) {
                     // OBS: not sure of this logic...
@@ -99,30 +115,27 @@ public class ForkJoinSolver extends SequentialSolver {
                 }
             }
 
-            this.steps++;
-
-            System.out.println(this.steps + " " + this.forkAfter);
-
-            if (this.steps % this.forkAfter == 0) {
-                int nextStart = frontier.pop();
-
-                this.createTask(nextStart);
-            }
             // Fork after
-            // ...
+            int mode = 1; // 0 - forkAfter, 1 - branching
+            boolean parentShouldWait = false;
 
-            // Fork on each split
-            // ...
+            if (mode == 0) {
+                if (this.steps % this.forkAfter == 0) {
+                    try {
+                        int nextStart = frontier.pop();
 
-            // if (children.hasNext()) {
-            // // Allow "parrent" to continue to do work.
-            // progress(current, children.next());
-            // }
+                        this.createTask(nextStart, parentShouldWait);
+                    } catch (Exception e) {
+                        System.out.println("to slow empty stack, or reached a dead end.");
+                    }
 
-            // if (children.hasNext()) {
-            // // Pas the itterator down and spawn new searches for each split.
-            // createTasks(current, children);
-            // }
+                }
+            }
+
+            // Fork on each branch
+            if (mode == 1 && childNodeCount > 1) {
+                this.createTask(frontier.pop(), parentShouldWait);
+            }
         }
 
         return joinTasks();
@@ -143,7 +156,7 @@ public class ForkJoinSolver extends SequentialSolver {
             List<Integer> sp = st.join();
 
             if (sp != null) {
-                System.out.println(sp);
+                System.out.println("Completed: " + sp);
 
                 return sp;
             }
@@ -152,7 +165,7 @@ public class ForkJoinSolver extends SequentialSolver {
         return null;
     }
 
-    private void createTask(int fromNode) {
+    private void createTask(int fromNode, boolean wait) {
         System.out.println("FROM " + fromNode);
         ForkJoinSolver task = new ForkJoinSolver(maze, this.forkAfter, this.predecessor, fromNode);
 
@@ -160,43 +173,21 @@ public class ForkJoinSolver extends SequentialSolver {
 
         task.fork();
 
-        return;
-    }
-
-    private void createTasks(int current, Iterator<Integer> children) {
-        while (children.hasNext()) {
-            int node;
-            ForkJoinSolver task = null;
-
-            synchronized (visited) {
-                node = children.next();
-
-                if (!visited.contains(node)) {
-                    task = new ForkJoinSolver(maze, forkAfter, predecessor, node);
-                    visited.add(node);
-                }
-            }
-
-            if (task == null) {
-                return;
-            }
-
-            subtasks.add(task);
-            predecessor.put(node, current); // Allow predecessor to keep track of "child searches".
-
-            task.fork();
-            // task.join(); // only for testing
+        if (wait) {
+            task.join();
         }
     }
 
-    private void progress(int current, int next) {
-        frontier.push(next);
-        visited.add(next);
-        predecessor.put(next, current);
-    }
+    private Set<Integer> explore(int current) throws Exception {
+        synchronized (visited) {
+            if (!visited.contains(current)) {
+                visited.add(current);
+            } else {
+                throw new Exception("Node is already visited");
+            }
 
-    private Set<Integer> explore(int current) {
-        visited.add(current);
+        }
+
         maze.move(player, current);
 
         Set<Integer> children = new HashSet<>();
