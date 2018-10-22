@@ -6,80 +6,90 @@ import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 /**
- * <code>ForkJoinSolver</code> implements a solver for <code>Maze</code> objects
- * using a fork/join multi-thread depth-first search.
+ * <code>ForkJoinSolver</code> implements a solver for
+ * <code>Maze</code> objects using a fork/join multi-thread
+ * depth-first search.
  * <p>
- * Instances of <code>ForkJoinSolver</code> should be run by a
- * <code>ForkJoinPool</code> object.
+ * Instances of <code>ForkJoinSolver</code> should be run by
+ * a <code>ForkJoinPool</code> object.
  */
 
 public class ForkJoinSolver extends SequentialSolver {
 
-    private static ConcurrentSkipListSet<Integer> visited = new ConcurrentSkipListSet<>();
+    private static Set<Integer> visited = new ConcurrentSkipListSet<>();
     private static boolean finished = false;
 
     private List<ForkJoinSolver> subtasks = new ArrayList<>();
     private int player;
     private int steps;
     private DescendantNode init;
-
     private Stack<DescendantNode> front;
 
     public class DescendantNode {
-        public int value;
-        public int parent;
+        int value;
+        int parent;
 
-        public DescendantNode(int value, int parent) {
+        DescendantNode(int value, int parent) {
             this.value = value;
             this.parent = parent;
         }
     }
 
     /**
-     * Creates a solver that searches in <code>maze</code> from the start node to a
-     * goal.
+     * Creates a solver that searches in <code>maze</code> from the
+     * start node to a goal.
      *
      * @param maze the maze to be searched
      */
-    public ForkJoinSolver(Maze maze) {
+    private ForkJoinSolver(Maze maze) {
         super(maze);
-    }
-
-    /**
-     * Creates a solver that searches in <code>maze</code> from the start node to a
-     * goal, forking after a given number of visited nodes.
-     *
-     * @param maze      the maze to be searched
-     * @param forkAfter the number of steps (visited nodes) after which a parallel
-     *                  task is forked; if <code>forkAfter &lt;= 0</code> the solver
-     *                  never forks new tasks
-     */
-    public ForkJoinSolver(Maze maze, int forkAfter) {
-        this(maze);
-        this.forkAfter = forkAfter;
         this.init = new DescendantNode(start, start);
         this.front = new Stack<>();
     }
 
-    private ForkJoinSolver(Maze maze, int forkAfter, Map<Integer, Integer> predecessor, DescendantNode node) {
-        this(maze, forkAfter);
-        this.predecessor = predecessor;
-        this.steps = 0;
-        this.front = new Stack<>();
-        this.init = node;
-
-        // System.out.println("starging at " + node.value + "; core start " +
-        // this.start);
+    /**
+     * Creates a solver that searches in <code>maze</code> from the
+     * start node to a goal, forking after a given number of visited
+     * nodes.
+     *
+     * @param maze          the maze to be searched
+     * @param forkAfter     the number of steps after which a parallel
+     *                      task is forked (if 0, the solver will not
+     *                      fork new tasks)
+     */
+    public ForkJoinSolver(Maze maze, int forkAfter) {
+        this(maze);
+        this.forkAfter = forkAfter;
     }
 
     /**
-     * Searches for and returns the path, as a list of node identifiers, that goes
-     * from the start node to a goal node in the maze. If such a path cannot be
-     * found (because there are no goals, or all goals are unreachable), the method
-     * returns <code>null</code>.
+     * Creates a solver that searches in <code>maze</code> from the
+     * outset node to a goal.
      *
-     * @return the list of node identifiers from the start node to a goal node in
-     *         the maze; <code>null</code> if such a path cannot be found.
+     * @param maze          the maze to be searched
+     * @param forkAfter     the number of steps after which a parallel
+     *                      task is forked (if 0, the solver will not
+     *                      fork new tasks)
+     * @param predecessor   the parent's predecessor map so that
+     *                      each child can continue the mapping
+     * @param outset        the starting point for the solver
+     */
+    private ForkJoinSolver(Maze maze, int forkAfter, Map<Integer, Integer> predecessor, DescendantNode outset) {
+        this(maze, forkAfter);
+        this.steps = 0;
+        this.init = outset;
+        this.predecessor = new HashMap<>(predecessor);
+    }
+
+    /**
+     * Searches for and returns the path, as a list of node identifiers
+     * that goes from the start node to a goal node in the maze. If such
+     * a path cannot be found (because there are no goals, or all goals
+     * are unreachable), the method returns <code>null</code>.
+     *
+     * @return the list of node identifiers from the start node to a goal
+     * node in the maze; if no such a path exists <code>null</code> is
+     * returned
      */
     @Override
     public List<Integer> compute() {
@@ -87,13 +97,12 @@ public class ForkJoinSolver extends SequentialSolver {
     }
 
     private List<Integer> parallelSearch() {
+
         synchronized (visited) {
             if (!visited.contains(this.init.value)) {
                 this.front.push(this.init);
                 this.player = maze.newPlayer(this.init.value);
-            } else {
-                return null;
-            }
+            } else { return null; }
         }
 
         while (!this.front.empty() && !finished) {
@@ -101,36 +110,30 @@ public class ForkJoinSolver extends SequentialSolver {
             DescendantNode current;
 
             try {
+
                 current = front.pop();
 
                 if (this.maze.hasGoal(current.value)) {
                     ForkJoinSolver.finished = true;
-
                     synchronized (visited) {
                         synchronized (predecessor) {
                             visited.add(current.value);
                             predecessor.put(current.value, current.parent);
                         }
                     }
-
                     this.maze.move(this.player, current.value);
-                    System.out.println(this.init.value + " I found the goal. @ " + current.value);
-
-                    List<Integer> goalPath = this.pathFromTo(this.start, current.value);
-
-                    System.out.println(goalPath);
-
-                    return goalPath;
-
+                    return this.pathFromTo(this.start, current.value);
                 }
 
                 children = this.explore(current);
+
             } catch (Exception e) {
-                // I have noting left in frontier or my frontier has already been explored.
+                // Either the frontier is empty or
+                // the current node already visited
                 continue;
             }
 
-            // Add unvisted childnodes to frontier.
+            // Add unvisited nodes to the frontier
             int childNodeCount = 0;
 
             for (DescendantNode childNode : children) {
@@ -140,65 +143,95 @@ public class ForkJoinSolver extends SequentialSolver {
                 }
             }
 
-            // Collect current env config.
-            int mode = Integer.parseInt(System.getenv("MODE")); // 0 - forkAfter, 1 - branching
+            /*
+             * Collect the current environment configurations. The MODE determines
+             * the forking logic and could be either 0 or 1.
+             *
+             *  0:  Continue sequentially for the number of consecutive steps
+             *      defined by forkAfter before forking new threads.
+             *
+             *  1:  Fork new threads only at intersections allowing different
+             *      threads to explore the different routes.
+             *
+             * The SHOULD_WAIT variable is of type boolean and informs the solver
+             * to either wait for its spawned children or continue in parallel.
+             *
+             */
+            int mode = Integer.parseInt(System.getenv("MODE"));
             boolean parentShouldWait = Boolean.parseBoolean(System.getenv("SHOULD_WAIT"));
 
             if (mode == 0) {
-                if (this.steps % (this.forkAfter + 1) == 0) {
+
+                if (steps % (forkAfter + 1) == 0) {
+
                     try {
-                        Iterator<DescendantNode> itr = this.front.iterator();
 
-                        while (itr.hasNext()) {
-                            this.createTask(itr.next());
-                        }
+                        Iterator<DescendantNode> it = front.iterator();
+                        if (it.hasNext())
+                            it.next();
+                        while (it.hasNext())
+                            createTask(it.next());
 
-                        if (parentShouldWait) {
-                            this.joinTasks();
-                        }
+                        if (parentShouldWait)
+                            joinTasks();
+
                     } catch (Exception e) {
                         return null;
                     }
                 }
             }
 
-            // Fork on each branch
-            if (mode == 1 && childNodeCount > 1) {
-                this.createTask(front.pop());
-            }
+            if (mode == 1 && childNodeCount > 1)
+                createTask(front.pop());
         }
 
         return joinTasks();
     }
 
+    /**
+     * Before returning, the parent thread waits for its subtasks to
+     * return their individual results. Once a subtask returns a list
+     * of integers, the goal is reached and the result is propagated
+     * up the tree of tasks until it reaches the root.
+     *
+     * @return the path of nodes between the start and the goal node
+     * if such exists, otherwise <code>null</code>
+     */
     private List<Integer> joinTasks() {
-        // ArrayList<String> w = new ArrayList<>();
-
-        // this.subtasks.forEach((x) -> {
-        // w.add(Integer.toString(x.start));
-        // });
-
-        // System.out.println(this.start + " waiting for: " + w.toString());
-
-        for (ForkJoinSolver st : subtasks) {
+       for (ForkJoinSolver st: subtasks) {
             List<Integer> sp = st.join();
-
-            if (sp != null) {
-                // System.out.println("here: " + sp);
+            if (sp != null)
                 return sp;
-            }
         }
-
         return null;
     }
 
-    private void createTask(DescendantNode fromNode) {
-        ForkJoinSolver task = new ForkJoinSolver(maze, this.forkAfter, this.predecessor, fromNode);
-
-        this.subtasks.add(task);
+    /**
+     * When the program decides to fork new subtasks, it iterates
+     * over the nodes that most recently have been discovered by the
+     * {@link #explore(DescendantNode) explore} method. For each node: (1) fork
+     * a new solver that will continue to explore the maze from that
+     * node; (2) save the solver to the list of subtasks; (3) update
+     * the <code>Map</> of predecessors.
+     *
+     * @param node   the current node
+     */
+    private void createTask(DescendantNode node) {
+        ForkJoinSolver task = new ForkJoinSolver(maze, forkAfter, predecessor, node);
+        subtasks.add(task);
         task.fork();
     }
 
+    /**
+     * Explores the opportunities of subsequent progression. It
+     * uses the {@link amazed.maze.Maze#neighbors(int) neighbors}
+     * method to identify valid adjacent nodes before filtering
+     * out the once that have not yet been visited.
+     *
+     * @param current the current node
+     * @return the <code>Set</code> of unvisited nodes reachable
+     * from the current position
+     */
     private Set<DescendantNode> explore(DescendantNode current) throws Exception {
         synchronized (visited) {
             synchronized (predecessor) {
