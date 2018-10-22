@@ -108,8 +108,8 @@ public class ForkJoinSolver extends SequentialSolver {
         // node (if so, return null right away)
         synchronized (visited) {
             if (!visited.contains(init.value)) {
-                this.front.push(this.init);
-                this.player = maze.newPlayer(init.value);
+                front.push(this.init);
+                player = maze.newPlayer(init.value);
             } else { return null; }
         }
 
