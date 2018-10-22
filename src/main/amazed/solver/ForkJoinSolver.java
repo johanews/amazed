@@ -87,12 +87,13 @@ public class ForkJoinSolver extends SequentialSolver {
     }
 
     private List<Integer> parallelSearch() {
-        if (!visited.contains(this.init.value)) {
-            this.front.push(this.init);
-            this.player = maze.newPlayer(this.init.value);
-            // System.out.println("Stating @: " + this.init.value);
-        } else {
-            return null;
+        synchronized (visited) {
+            if (!visited.contains(this.init.value)) {
+                this.front.push(this.init);
+                this.player = maze.newPlayer(this.init.value);
+            } else {
+                return null;
+            }
         }
 
         while (!this.front.empty() && !finished) {
@@ -105,7 +106,6 @@ public class ForkJoinSolver extends SequentialSolver {
                 if (this.maze.hasGoal(current.value)) {
                     ForkJoinSolver.finished = true;
 
-                    // FIXME: create a single lock instead.
                     synchronized (visited) {
                         synchronized (predecessor) {
                             visited.add(current.value);
@@ -147,9 +147,16 @@ public class ForkJoinSolver extends SequentialSolver {
             if (mode == 0) {
                 if (this.steps % (this.forkAfter + 1) == 0) {
                     try {
-                        this.createTask(front.pop(), parentShouldWait);
+                        Iterator<DescendantNode> itr = this.front.iterator();
+
+                        while (itr.hasNext()) {
+                            this.createTask(itr.next());
+                        }
+
+                        if (parentShouldWait) {
+                            this.joinTasks();
+                        }
                     } catch (Exception e) {
-                        // Too slow empty stack, or reached a dead end.
                         return null;
                     }
                 }
@@ -157,22 +164,19 @@ public class ForkJoinSolver extends SequentialSolver {
 
             // Fork on each branch
             if (mode == 1 && childNodeCount > 1) {
-                this.createTask(front.pop(), parentShouldWait);
+                this.createTask(front.pop());
             }
         }
 
-        return
-
-        joinTasks();
-
+        return joinTasks();
     }
 
     private List<Integer> joinTasks() {
-        ArrayList<String> w = new ArrayList<>();
+        // ArrayList<String> w = new ArrayList<>();
 
-        this.subtasks.forEach((x) -> {
-            w.add(Integer.toString(x.start));
-        });
+        // this.subtasks.forEach((x) -> {
+        // w.add(Integer.toString(x.start));
+        // });
 
         // System.out.println(this.start + " waiting for: " + w.toString());
 
@@ -188,14 +192,11 @@ public class ForkJoinSolver extends SequentialSolver {
         return null;
     }
 
-    private void createTask(DescendantNode fromNode, boolean wait) {
+    private void createTask(DescendantNode fromNode) {
         ForkJoinSolver task = new ForkJoinSolver(maze, this.forkAfter, this.predecessor, fromNode);
+
         this.subtasks.add(task);
         task.fork();
-
-        if (wait) {
-            task.join();
-        }
     }
 
     private Set<DescendantNode> explore(DescendantNode current) throws Exception {
