@@ -96,8 +96,16 @@ public class ForkJoinSolver extends SequentialSolver {
         return parallelSearch();
     }
 
+    /**
+     * The
+     *
+     * @return the path of nodes between the start and the goal node
+     * if such exists, otherwise <code>null</code>
+     */
     private List<Integer> parallelSearch() {
 
+        // Make sure no other solver has visited this
+        // node (if so, return null right away)
         synchronized (visited) {
             if (!visited.contains(init.value)) {
                 this.front.push(this.init);
