@@ -99,13 +99,13 @@ public class ForkJoinSolver extends SequentialSolver {
     private List<Integer> parallelSearch() {
 
         synchronized (visited) {
-            if (!visited.contains(this.init.value)) {
+            if (!visited.contains(init.value)) {
                 this.front.push(this.init);
-                this.player = maze.newPlayer(this.init.value);
+                this.player = maze.newPlayer(init.value);
             } else { return null; }
         }
 
-        while (!this.front.empty() && !finished) {
+        while (!front.empty() && !finished) {
             Set<DescendantNode> children;
             DescendantNode current;
 
@@ -113,19 +113,17 @@ public class ForkJoinSolver extends SequentialSolver {
 
                 current = front.pop();
 
-                if (this.maze.hasGoal(current.value)) {
-                    ForkJoinSolver.finished = true;
+                if (maze.hasGoal(current.value)) {
+                    finished = true;
                     synchronized (visited) {
-                        synchronized (predecessor) {
-                            visited.add(current.value);
-                            predecessor.put(current.value, current.parent);
-                        }
+                        visited.add(current.value);
+                        predecessor.put(current.value, current.parent);
                     }
-                    this.maze.move(this.player, current.value);
-                    return this.pathFromTo(this.start, current.value);
+                    maze.move(player, current.value);
+                    return pathFromTo(start, current.value);
                 }
 
-                children = this.explore(current);
+                children = explore(current);
 
             } catch (Exception e) {
                 // Either the frontier is empty or
@@ -181,9 +179,10 @@ public class ForkJoinSolver extends SequentialSolver {
                 }
             }
 
-            if (mode == 1 && childNodeCount > 1)
+            if (mode == 1 && childNodeCount > 1) {
                 while (front.size() > 1)
                     createTask(front.pop());
+            }
         }
 
         return joinTasks();
@@ -199,7 +198,7 @@ public class ForkJoinSolver extends SequentialSolver {
      * if such exists, otherwise <code>null</code>
      */
     private List<Integer> joinTasks() {
-       for (ForkJoinSolver st: subtasks) {
+        for (ForkJoinSolver st: subtasks) {
             List<Integer> sp = st.join();
             if (sp != null)
                 return sp;
@@ -208,14 +207,10 @@ public class ForkJoinSolver extends SequentialSolver {
     }
 
     /**
-     * When the program decides to fork new subtasks, it iterates
-     * over the nodes that most recently have been discovered by the
-     * {@link #explore(DescendantNode) explore} method. For each node: (1) fork
-     * a new solver that will continue to explore the maze from that
-     * node; (2) save the solver to the list of subtasks; (3) update
-     * the <code>Map</> of predecessors.
+     * Each node is assigned a new solver that is added to the list
+     * of subtasks before start.
      *
-     * @param node   the current node
+     * @param node the current node
      */
     private void createTask(DescendantNode node) {
         ForkJoinSolver task = new ForkJoinSolver(maze, forkAfter, predecessor, node);
@@ -235,13 +230,11 @@ public class ForkJoinSolver extends SequentialSolver {
      */
     private Set<DescendantNode> explore(DescendantNode current) throws Exception {
         synchronized (visited) {
-            synchronized (predecessor) {
-                if (!visited.contains(current.value)) {
-                    visited.add(current.value);
-                    predecessor.put(current.value, current.parent);
-                } else {
-                    throw new Exception("Node is already visited");
-                }
+            if (!visited.contains(current.value)) {
+                visited.add(current.value);
+                predecessor.put(current.value, current.parent);
+            } else {
+                throw new Exception("Node is already visited");
             }
         }
 
