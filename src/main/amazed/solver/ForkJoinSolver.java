@@ -206,7 +206,7 @@ public class ForkJoinSolver extends SequentialSolver {
     private Set<DescendantNode> explore(DescendantNode current) {
         Set<DescendantNode> options = new HashSet<>();
         for (int nb : maze.neighbors(current.value)) {
-            if(!visited.contains(nb))
+            if (!visited.contains(nb))
                 options.add(new DescendantNode(nb, current.value));
         }
         return options;
