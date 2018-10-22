@@ -20,7 +20,6 @@ public class ForkJoinSolver extends SequentialSolver {
     private static boolean finished = false;
 
     private List<ForkJoinSolver> subtasks = new ArrayList<>();
-    private int player;
     private int steps;
     private DescendantNode init;
     private Stack<DescendantNode> front;
@@ -97,51 +96,28 @@ public class ForkJoinSolver extends SequentialSolver {
     }
 
     private List<Integer> parallelSearch() {
+        int player = maze.newPlayer(init.value);
 
-        synchronized (visited) {
-            if (!visited.contains(this.init.value)) {
-                this.front.push(this.init);
-                this.player = maze.newPlayer(this.init.value);
-            } else { return null; }
-        }
+        if (!visited.contains(init.value))
+            front.push(init);
+        else return null;
 
-        while (!this.front.empty() && !finished) {
-            Set<DescendantNode> children;
-            DescendantNode current;
+        while (!front.empty() && !finished) {
 
-            try {
+            DescendantNode current = front.pop();
 
-                current = front.pop();
+            visited.add(current.value);
+            maze.move(player, current.value);
+            predecessor.put(current.value, current.parent);
 
-                if (this.maze.hasGoal(current.value)) {
-                    ForkJoinSolver.finished = true;
-                    synchronized (visited) {
-                        synchronized (predecessor) {
-                            visited.add(current.value);
-                            predecessor.put(current.value, current.parent);
-                        }
-                    }
-                    this.maze.move(this.player, current.value);
-                    return this.pathFromTo(this.start, current.value);
-                }
+            steps++;
 
-                children = this.explore(current);
-
-            } catch (Exception e) {
-                // Either the frontier is empty or
-                // the current node already visited
-                continue;
+            if (maze.hasGoal(current.value)) {
+                finished = true;
+                return pathFromTo(start, current.value);
             }
 
-            // Add unvisited nodes to the frontier
-            int childNodeCount = 0;
-
-            for (DescendantNode childNode : children) {
-                if (!visited.contains(childNode.value)) {
-                    front.push(childNode);
-                    childNodeCount++;
-                }
-            }
+            Iterator<DescendantNode> it = explore(current).iterator();
 
             /*
              * Collect the current environment configurations. The MODE determines
@@ -163,27 +139,25 @@ public class ForkJoinSolver extends SequentialSolver {
             if (mode == 0) {
 
                 if (steps % (forkAfter + 1) == 0) {
-
-                    try {
-
-                        Iterator<DescendantNode> it = front.iterator();
-                        if (it.hasNext())
-                            it.next();
-                        while (it.hasNext())
-                            createTask(it.next());
-
-                        if (parentShouldWait)
-                            joinTasks();
-
-                    } catch (Exception e) {
-                        return null;
-                    }
+                    while (it.hasNext())
+                        createTask(it.next());
+                    if (parentShouldWait)
+                        joinTasks();
+                } else {
+                    while (it.hasNext())
+                        front.push(it.next());
                 }
+
             }
 
-            if (mode == 1 && childNodeCount > 1)
-                while (front.size() > 1)
-                    createTask(front.pop());
+            if (mode == 1) {
+
+                if (it.hasNext())
+                    front.push(it.next());
+                while (it.hasNext())
+                    createTask(it.next());
+            }
+
         }
 
         return joinTasks();
@@ -208,14 +182,10 @@ public class ForkJoinSolver extends SequentialSolver {
     }
 
     /**
-     * When the program decides to fork new subtasks, it iterates
-     * over the nodes that most recently have been discovered by the
-     * {@link #explore(DescendantNode) explore} method. For each node: (1) fork
-     * a new solver that will continue to explore the maze from that
-     * node; (2) save the solver to the list of subtasks; (3) update
-     * the <code>Map</> of predecessors.
+     * Each node is assigned a new solver that is added to the list
+     * of subtasks before start.
      *
-     * @param node   the current node
+     * @param node the current node
      */
     private void createTask(DescendantNode node) {
         ForkJoinSolver task = new ForkJoinSolver(maze, forkAfter, predecessor, node);
@@ -233,28 +203,13 @@ public class ForkJoinSolver extends SequentialSolver {
      * @return the <code>Set</code> of unvisited nodes reachable
      * from the current position
      */
-    private Set<DescendantNode> explore(DescendantNode current) throws Exception {
-        synchronized (visited) {
-            synchronized (predecessor) {
-                if (!visited.contains(current.value)) {
-                    visited.add(current.value);
-                    predecessor.put(current.value, current.parent);
-                } else {
-                    throw new Exception("Node is already visited");
-                }
-            }
+    private Set<DescendantNode> explore(DescendantNode current) {
+        Set<DescendantNode> options = new HashSet<>();
+        for (int nb : maze.neighbors(current.value)) {
+            if(!visited.contains(nb))
+                options.add(new DescendantNode(nb, current.value));
         }
-
-        maze.move(player, current.value);
-        steps++;
-
-        Set<DescendantNode> children = new HashSet<>();
-
-        for (int child : maze.neighbors(current.value)) {
-            children.add(new DescendantNode(child, current.value));
-        }
-
-        return children;
+        return options;
     }
 
 }
