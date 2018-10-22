@@ -180,7 +180,7 @@ public class ForkJoinSolver extends SequentialSolver {
             }
 
             if (mode == 1 && childNodeCount > 1) {
-                while (front.size() > 1)
+                while (front.size() > (front.size() - childNodeCount + 1))
                     createTask(front.pop());
             }
         }
