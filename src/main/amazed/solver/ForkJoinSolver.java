@@ -19,7 +19,6 @@ public class ForkJoinSolver extends SequentialSolver {
     private static boolean finished = false;
 
     private List<ForkJoinSolver> subtasks = new ArrayList<>();
-    private int outset = start;
     private int player;
     private int steps;
     private DescendantNode init;
@@ -60,7 +59,6 @@ public class ForkJoinSolver extends SequentialSolver {
         this.forkAfter = forkAfter;
         this.init = new DescendantNode(start, start);
         this.front = new Stack<>();
-        // System.out.println("RAN");
     }
 
     private ForkJoinSolver(Maze maze, int forkAfter, Map<Integer, Integer> predecessor, DescendantNode node) {
@@ -69,10 +67,9 @@ public class ForkJoinSolver extends SequentialSolver {
         this.steps = 0;
         this.front = new Stack<>();
         this.init = node;
-        // System.out.println("New child");
 
-        // A node can exist in other frontiers, we want to make sure that only one
-        // player can be created on a single node.
+        // System.out.println("starging at " + node.value + "; core start " +
+        // this.start);
     }
 
     /**
@@ -93,10 +90,8 @@ public class ForkJoinSolver extends SequentialSolver {
         if (!visited.contains(this.init.value)) {
             this.front.push(this.init);
             this.player = maze.newPlayer(this.init.value);
-
-            // System.out.println("start: " + this.init.value);
+            // System.out.println("Stating @: " + this.init.value);
         } else {
-            // System.out.println("Duplicated player!");
             return null;
         }
 
@@ -107,27 +102,35 @@ public class ForkJoinSolver extends SequentialSolver {
             try {
                 current = front.pop();
 
-                if (this.isGoal(current.value)) {
-                    synchronized (predecessor) {
-                        predecessor.put(current.value, current.parent);
+                if (this.maze.hasGoal(current.value)) {
+                    ForkJoinSolver.finished = true;
+
+                    // FIXME: create a single lock instead.
+                    synchronized (visited) {
+                        synchronized (predecessor) {
+                            visited.add(current.value);
+                            predecessor.put(current.value, current.parent);
+                        }
                     }
 
                     this.maze.move(this.player, current.value);
-                    // System.out.println(this.init.value + " I found the goal. @ " +
-                    // current.value);
+                    System.out.println(this.init.value + " I found the goal. @ " + current.value);
 
-                    return this.pathFromTo(outset, current.value);
+                    List<Integer> goalPath = this.pathFromTo(this.start, current.value);
+
+                    System.out.println(goalPath);
+
+                    return goalPath;
+
                 }
 
                 children = this.explore(current);
             } catch (Exception e) {
-                // System.out.println("I have noting left in frontier or my frontier has already
-                // been explored. ");
-
+                // I have noting left in frontier or my frontier has already been explored.
                 continue;
             }
 
-            // Add children to frontier
+            // Add unvisted childnodes to frontier.
             int childNodeCount = 0;
 
             for (DescendantNode childNode : children) {
@@ -137,19 +140,18 @@ public class ForkJoinSolver extends SequentialSolver {
                 }
             }
 
-            // Fork after
-            int mode = 0; // 0 - forkAfter, 1 - branching
-            boolean parentShouldWait = false;
+            // Collect current env config.
+            int mode = Integer.parseInt(System.getenv("MODE")); // 0 - forkAfter, 1 - branching
+            boolean parentShouldWait = Boolean.parseBoolean(System.getenv("SHOULD_WAIT"));
 
             if (mode == 0) {
                 if (this.steps % (this.forkAfter + 1) == 0) {
                     try {
                         this.createTask(front.pop(), parentShouldWait);
                     } catch (Exception e) {
-                        // System.out.println("Too slow empty stack, or reached a dead end.");
+                        // Too slow empty stack, or reached a dead end.
                         return null;
                     }
-
                 }
             }
 
@@ -159,17 +161,10 @@ public class ForkJoinSolver extends SequentialSolver {
             }
         }
 
-        return joinTasks();
-    }
+        return
 
-    private boolean isGoal(int current) {
-        if (this.maze.hasGoal(current)) {
-            // maze.move(player, current);
+        joinTasks();
 
-            ForkJoinSolver.finished = true;
-        }
-
-        return ForkJoinSolver.finished;
     }
 
     private List<Integer> joinTasks() {
@@ -194,11 +189,8 @@ public class ForkJoinSolver extends SequentialSolver {
     }
 
     private void createTask(DescendantNode fromNode, boolean wait) {
-        // System.out.println("Creating task");
         ForkJoinSolver task = new ForkJoinSolver(maze, this.forkAfter, this.predecessor, fromNode);
-
         this.subtasks.add(task);
-
         task.fork();
 
         if (wait) {
@@ -208,11 +200,13 @@ public class ForkJoinSolver extends SequentialSolver {
 
     private Set<DescendantNode> explore(DescendantNode current) throws Exception {
         synchronized (visited) {
-            if (!visited.contains(current.value)) {
-                visited.add(current.value);
-                predecessor.put(current.value, current.parent);
-            } else {
-                throw new Exception("Node is already visited");
+            synchronized (predecessor) {
+                if (!visited.contains(current.value)) {
+                    visited.add(current.value);
+                    predecessor.put(current.value, current.parent);
+                } else {
+                    throw new Exception("Node is already visited");
+                }
             }
         }
 
