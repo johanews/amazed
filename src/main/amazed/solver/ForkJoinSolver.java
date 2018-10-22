@@ -97,7 +97,8 @@ public class ForkJoinSolver extends SequentialSolver {
     }
 
     /**
-     * The
+     * A hybrid solution that implements different searching logic depending
+     * on environment variables and input parameters.
      *
      * @return the path of nodes between the start and the goal node
      * if such exists, otherwise <code>null</code>
