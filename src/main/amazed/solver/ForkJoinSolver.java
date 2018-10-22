@@ -76,7 +76,7 @@ public class ForkJoinSolver extends SequentialSolver {
      */
     private ForkJoinSolver(Maze maze, int forkAfter, Map<Integer, Integer> predecessor, DescendantNode outset) {
         this(maze, forkAfter);
-        this.steps = 0;
+        this.steps = 1;
         this.init = outset;
         this.predecessor = new HashMap<>(predecessor);
     }
@@ -169,7 +169,7 @@ public class ForkJoinSolver extends SequentialSolver {
 
             if (mode == 0) {
 
-                if (steps % (forkAfter + 1) == 0) {
+                if (steps % forkAfter == 0) {
 
                     try {
 
