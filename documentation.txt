@@ -1,1 +1,3 @@
-Hello
+We have created a hybrid solution that implements different searching logic depending
+on environment variables and input parameters. A detailed description of our code can
+be studied in the PDF inside distinction the assignment folder.
