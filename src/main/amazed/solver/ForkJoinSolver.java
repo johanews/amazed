@@ -76,7 +76,7 @@ public class ForkJoinSolver extends SequentialSolver {
      */
     private ForkJoinSolver(Maze maze, int forkAfter, Map<Integer, Integer> predecessor, DescendantNode outset) {
         this(maze, forkAfter);
-        this.steps = 1;
+        this.steps = 0;
         this.init = outset;
         this.predecessor = new HashMap<>(predecessor);
     }
@@ -97,8 +97,9 @@ public class ForkJoinSolver extends SequentialSolver {
     }
 
     /**
-     * A hybrid solution that implements different searching logic depending
-     * on environment variables and input parameters.
+     * Applies parallel search using the ForkJoinPool toolkit. The specific
+     * logic is defined by the environment variables as well as the program
+     * arguments.
      *
      * @return the path of nodes between the start and the goal node
      * if such exists, otherwise <code>null</code>
@@ -169,7 +170,7 @@ public class ForkJoinSolver extends SequentialSolver {
 
             if (mode == 0) {
 
-                if (steps % forkAfter == 0) {
+                if (steps % (forkAfter + 1) == 0) {
 
                     try {
 
