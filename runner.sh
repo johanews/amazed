@@ -4,7 +4,7 @@
 # SHOULD_WAIT - true|false if the parrent process should wait on forked threads before it continues.
 # POOL_SIZE int - workers in the pool
 
-REACH=10
+REACH=1
 
 function run {
     settings=(1 2 4 8)
@@ -16,7 +16,7 @@ function run {
 
         while [ $counter -lt $REACH ]; do
             POOL_SIZE=${pool_size} MODE=$3 SHOULD_WAIT=$4 java -cp src/main amazed.Main $2 $1 -1
-            
+        
             counter=$(( $counter + 1 ))
         done
         counter=0
@@ -28,10 +28,6 @@ maps=(small medium large huge)
 for name in "${maps[@]}"
 do
     echo "Running: ${name}"
-
-    echo "parallel ${name}.map branch with wait"
-    run parallel-3 maps/${name}.map 1 true
-    echo "------------------------------------"
 
     echo "parallel-3 ${name}.map fork after"
     run parallel-3 maps/${name}.map 0 false
